@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import * as Updates from 'expo-updates';
 import { useEffect } from 'react';
+import { Redirect } from 'expo-router';
 
 export default function RootLayout() {
   useEffect(() => {
@@ -9,17 +10,16 @@ export default function RootLayout() {
         const update = await Updates.checkForUpdateAsync();
         if (update.isAvailable) {
           await Updates.fetchUpdateAsync();
-          await Updates.reloadAsync(); // güncelleme varsa otomatik yeniden başlat
+          await Updates.reloadAsync();
         }
-      } catch (e) {
-        // hata olursa sessizce geç
-      }
+      } catch (e) {}
     }
     guncellemekontrol();
   }, []);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
       <Stack.Screen name="login" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="AdminPanel" />
