@@ -141,7 +141,7 @@ export default function Login() {
   return (
     <View style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.title}>İnşaat Takip v2</Text>
+        <Text style={styles.title}>İnşaat Takip v3</Text>
         <Text style={styles.subtitle}>Yönetici Paneli</Text>
 
         <TextInput 
