@@ -1,18 +1,22 @@
 import { Stack } from 'expo-router';
 import * as Updates from 'expo-updates';
 import { useEffect } from 'react';
-import { Redirect } from 'expo-router';
 
 export default function RootLayout() {
   useEffect(() => {
     async function guncellemekontrol() {
       try {
-        const update = await Updates.checkForUpdateAsync();
-        if (update.isAvailable) {
-          await Updates.fetchUpdateAsync();
-          await Updates.reloadAsync();
+        if (!Updates.isEmbeddedLaunch) {
+          const update = await Updates.checkForUpdateAsync();
+          console.log('Güncelleme kontrol edildi:', update.isAvailable);
+          if (update.isAvailable) {
+            await Updates.fetchUpdateAsync();
+            await Updates.reloadAsync();
+          }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.log('Güncelleme hatası:', e);
+      }
     }
     guncellemekontrol();
   }, []);

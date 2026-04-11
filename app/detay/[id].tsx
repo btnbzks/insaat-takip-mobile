@@ -14,8 +14,8 @@ export default function ProjeDetay() {
   const [aktifSekme, setAktifSekme] = useState<SekmeTipi>('ustalar');
   const [ustalar, setUstalar] = useState<any[]>([]);
   const [finans, setFinans] = useState<any[]>([]);
-  const [stok, setStok] = useState<any[]>([]); 
-  const [planlananlar, setPlanlananlar] = useState<any[]>([]); 
+  const [stok, setStok] = useState<any[]>([]);
+  const [planlananlar, setPlanlananlar] = useState<any[]>([]);
   const [yukleniyor, setYukleniyor] = useState(true);
 
   // Modallar
@@ -23,8 +23,10 @@ export default function ProjeDetay() {
   const [odemeModal, setOdemeModal] = useState(false);
   const [finansModal, setFinansModal] = useState(false);
   const [ortakModal, setOrtakModal] = useState(false);
-  const [duzenleModal, setDuzenleModal] = useState(false); 
+  const [duzenleModal, setDuzenleModal] = useState(false);
   const [fotoModal, setFotoModal] = useState(false);
+  const [manuelStokModal, setManuelStokModal] = useState(false);
+  const [manuelMetrajModal, setManuelMetrajModal] = useState(false);
 
   // State'ler
   const [seciliFotoUrl, setSeciliFotoUrl] = useState('');
@@ -36,19 +38,23 @@ export default function ProjeDetay() {
   const [yeniFinansAciklama, setYeniFinansAciklama] = useState('');
   const [yeniFinansTutar, setYeniFinansTutar] = useState('');
   const [yeniFinansTur, setYeniFinansTur] = useState<'GELİR' | 'GİDER'>('GİDER');
-  const [seciliFinansId, setSeciliFinansId] = useState<number | null>(null); 
+  const [seciliFinansId, setSeciliFinansId] = useState<number | null>(null);
   const [ortakEmail, setOrtakEmail] = useState('');
+  const [yeniStokAd, setYeniStokAd] = useState('');
+  const [yeniStokMiktar, setYeniStokMiktar] = useState('');
+  const [yeniStokBirim, setYeniStokBirim] = useState('');
+  const [yeniStokFiyat, setYeniStokFiyat] = useState('');
+  const [yeniMetrajAd, setYeniMetrajAd] = useState('');
+  const [yeniMetrajMiktar, setYeniMetrajMiktar] = useState('');
+  const [yeniMetrajBirim, setYeniMetrajBirim] = useState('');
 
-  // ------------------------------------------------------------------
-  // GÜNCELLENEN KISIM: SUNUCU ADRESLERİ "HTTPS" OLARAK DÜZELTİLDİ
-  // ------------------------------------------------------------------
   const verileriGetir = () => {
     setYukleniyor(true);
     Promise.all([
       fetch(`https://insaat-takip.onrender.com/api/cariler/proje/${id}`).then(res => res.json()),
       fetch(`https://insaat-takip.onrender.com/api/finans/proje/${id}`).then(res => res.json()),
       fetch(`https://insaat-takip.onrender.com/api/stock/proje/${id}`).then(res => res.json()),
-      fetch(`https://insaat-takip.onrender.com/api/metraj/proje/${id}`).then(res => res.json()) 
+      fetch(`https://insaat-takip.onrender.com/api/metraj/proje/${id}`).then(res => res.json())
     ]).then(([ustalarData, finansData, stokData, metrajData]) => {
       setUstalar(ustalarData);
       setFinans(finansData);
@@ -63,9 +69,6 @@ export default function ProjeDetay() {
 
   useEffect(() => { verileriGetir(); }, [id]);
 
-  // ------------------------------------------------------------------
-  // GÜNCELLENEN KISIM: FOTOĞRAF SEÇME VE YÜKLEME MEKANİZMASI EKLENDİ
-  // ------------------------------------------------------------------
   const belgeYukleTetikle = (tur: 'irsaliye' | 'metraj') => {
     Alert.alert(`${tur === 'irsaliye' ? 'İrsaliye' : 'Metraj Raporu'} Tara`, "Yükleme yöntemini seçin:", [
       { text: "İptal", style: "cancel" },
@@ -77,7 +80,6 @@ export default function ProjeDetay() {
   const fotoCek = async (tur: 'irsaliye' | 'metraj') => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') return Alert.alert("Hata", "Kamera izni reddedildi!");
-    
     const result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
     if (!result.canceled && result.assets[0]) belgeFotoGonder(result.assets[0].uri, tur);
   };
@@ -85,23 +87,19 @@ export default function ProjeDetay() {
   const galeridenSec = async (tur: 'irsaliye' | 'metraj') => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') return Alert.alert("Hata", "Galeri izni reddedildi!");
-    
     const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7 });
     if (!result.canceled && result.assets[0]) belgeFotoGonder(result.assets[0].uri, tur);
   };
 
   const belgeFotoGonder = async (uri: string, tur: 'irsaliye' | 'metraj') => {
     setYukleniyor(true);
-    
     try {
-      // --- YENİ EKLENEN SIKIŞTIRMA KODU BAŞLANGICI ---
       const compressedImage = await ImageManipulator.manipulateAsync(
         uri,
         [{ resize: { width: 1080 } }],
         { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
       );
       const islenecekUri = compressedImage.uri;
-      // --- SIKIŞTIRMA KODU BİTİŞİ ---
 
       const formData = new FormData();
       let filename = islenecekUri.split('/').pop();
@@ -114,18 +112,17 @@ export default function ProjeDetay() {
         type: type
       } as any);
 
-      // SADECE RENDER ADRESİMİZ
-      const endpoint = tur === 'irsaliye' 
+      const endpoint = tur === 'irsaliye'
         ? `https://insaat-takip.onrender.com/api/stock/proje/${id}/irsaliye`
         : `https://insaat-takip.onrender.com/api/metraj/proje/${id}/yukle`;
 
       const res = await fetch(endpoint, {
-          method: 'POST',
-          body: formData,
-          headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'multipart/form-data',
-          },
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'multipart/form-data',
+        },
       });
 
       const mesaj = await res.text();
@@ -133,7 +130,7 @@ export default function ProjeDetay() {
 
       if (res.ok) {
         Alert.alert("Yapay Zeka Başarılı!", "İrsaliye okundu ve sisteme kaydedildi.");
-        verileriGetir(); // Listeyi otomatik yenile
+        verileriGetir();
       } else {
         Alert.alert("Hata Oluştu", mesaj);
       }
@@ -144,9 +141,46 @@ export default function ProjeDetay() {
     }
   };
 
-  // ------------------------------------------------------------------
-  // AŞAĞIDAKİ HİÇBİR KOD DEĞİŞTİRİLMEDİ - ESKİ ADRESLER HTTPS YAPILDI
-  // ------------------------------------------------------------------
+  const manuelStokKaydet = () => {
+    if (!yeniStokAd || !yeniStokMiktar) return Alert.alert("Hata", "Ad ve miktar giriniz!");
+    fetch(`https://insaat-takip.onrender.com/api/stock/proje/${id}/manuel`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        itemName: yeniStokAd,
+        quantity: parseFloat(yeniStokMiktar),
+        unitType: yeniStokBirim || 'adet',
+        pricePerUnit: parseFloat(yeniStokFiyat) || 0
+      })
+    }).then(res => {
+      if (res.ok) {
+        setManuelStokModal(false);
+        setYeniStokAd(''); setYeniStokMiktar(''); setYeniStokBirim(''); setYeniStokFiyat('');
+        verileriGetir();
+      } else {
+        Alert.alert("Hata", "Kayıt yapılamadı.");
+      }
+    });
+  };
+
+  const manuelMetrajKaydet = () => {
+    if (!yeniMetrajAd || !yeniMetrajMiktar) return Alert.alert("Hata", "Ad ve miktar giriniz!");
+    fetch(`https://insaat-takip.onrender.com/api/metraj/proje/${id}/manuel`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        itemName: yeniMetrajAd,
+        plannedQuantity: parseFloat(yeniMetrajMiktar),
+        unitType: yeniMetrajBirim || 'adet'
+      })
+    }).then(res => {
+      if (res.ok) {
+        setManuelMetrajModal(false);
+        setYeniMetrajAd(''); setYeniMetrajMiktar(''); setYeniMetrajBirim('');
+        verileriGetir();
+      } else {
+        Alert.alert("Hata", "Kayıt yapılamadı.");
+      }
+    });
+  };
 
   const ortakKaydet = () => {
     if (!ortakEmail) return;
@@ -172,7 +206,7 @@ export default function ProjeDetay() {
     Alert.alert("Ustayı Sil", "Bu ustayı şantiyeden çıkarmak istiyor musun?", [
       { text: "İptal", style: "cancel" },
       { text: "Sil", style: "destructive", onPress: () => {
-          fetch(`https://insaat-takip.onrender.com/api/cariler/${ustaId}`, { method: 'DELETE' }).then(res => { if (res.ok) verileriGetir(); });
+        fetch(`https://insaat-takip.onrender.com/api/cariler/${ustaId}`, { method: 'DELETE' }).then(res => { if (res.ok) verileriGetir(); });
       }}
     ]);
   };
@@ -264,7 +298,6 @@ export default function ProjeDetay() {
   );
 
   const stokKartiCiz = ({ item }: { item: any }) => (
-    // DİKKAT: Cloudinary linki direkt 'irsaliyeImageName' içinde geliyor, başına 'uploads' eklemeye gerek yok
     <TouchableOpacity style={styles.card} onPress={() => { setSeciliFotoUrl(item.irsaliyeImageName); setFotoModal(true); }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <View>
@@ -284,13 +317,10 @@ export default function ProjeDetay() {
     const gerceklesenMiktar = stok.filter(s => {
       let hedefAd = item.itemName.toLowerCase().replace(/ø/g, 'q').replace(/i̇/g, 'i').trim();
       let stokAd = s.itemName.toLowerCase().replace(/ø/g, 'q').replace(/i̇/g, 'i').trim();
-      
       if (stokAd.includes(hedefAd) || hedefAd.includes(stokAd)) return true;
-
       const capHedef = hedefAd.match(/q\d+(-q\d+)?/);
       const capStok = stokAd.match(/q\d+(-q\d+)?/);
       if (capHedef && capStok && capHedef[0] === capStok[0]) return true;
-
       return false;
     }).reduce((toplam, s) => toplam + s.quantity, 0);
 
@@ -300,7 +330,6 @@ export default function ProjeDetay() {
     return (
       <View style={styles.card}>
         <Text style={styles.cardTitle}>🎯 {item.itemName}</Text>
-        
         <View style={styles.metrajDetayRow}>
           <View>
             <Text style={{fontSize: 10, color: '#666'}}>Planlanan Hedef</Text>
@@ -311,7 +340,6 @@ export default function ProjeDetay() {
             <Text style={{fontSize: 14, fontWeight: 'bold', color: '#0d6efd'}}>{gerceklesenMiktar} {item.unitType}</Text>
           </View>
         </View>
-
         <View style={styles.progressBarBg}>
           <View style={[styles.progressBarFill, { width: `${yuzde}%`, backgroundColor: yuzde >= 100 ? '#198754' : '#0d6efd' }]} />
         </View>
@@ -325,8 +353,8 @@ export default function ProjeDetay() {
   const getAktifListeData = () => {
     if (aktifSekme === 'ustalar') return ustalar;
     if (aktifSekme === 'finans') return finans;
-    if (aktifSekme === 'stok') return stok; 
-    if (aktifSekme === 'metraj') return planlananlar; 
+    if (aktifSekme === 'stok') return stok;
+    if (aktifSekme === 'metraj') return planlananlar;
     return [];
   };
 
@@ -365,23 +393,34 @@ export default function ProjeDetay() {
       </View>
 
       <View style={styles.content}>
-        {yukleniyor ? <ActivityIndicator size="large" color="#0d6efd" /> : 
-          <FlatList 
-            data={getAktifListeData()} 
-            keyExtractor={(item) => item.id.toString()} 
+        {yukleniyor ? <ActivityIndicator size="large" color="#0d6efd" /> :
+          <FlatList
+            data={getAktifListeData()}
+            keyExtractor={(item) => item.id.toString()}
             renderItem={aktifSekme === 'ustalar' ? ustaKartiCiz : (aktifSekme === 'finans' ? finansKartiCiz : (aktifSekme === 'stok' ? stokKartiCiz : metrajKartiCiz))}
-            ListHeaderComponent={getAktifHeader()} 
+            ListHeaderComponent={getAktifHeader()}
           />
         }
       </View>
 
-      <TouchableOpacity 
-        style={[styles.fabButton, { backgroundColor: aktifSekme === 'ustalar' ? '#0d6efd' : (aktifSekme === 'finans' ? '#198754' : (aktifSekme === 'stok' ? '#6c757d' : '#8540f5')) }]} 
+      <TouchableOpacity
+        style={[styles.fabButton, { backgroundColor: aktifSekme === 'ustalar' ? '#0d6efd' : (aktifSekme === 'finans' ? '#198754' : (aktifSekme === 'stok' ? '#6c757d' : '#8540f5')) }]}
         onPress={() => {
           if (aktifSekme === 'ustalar') setUstaModal(true);
           else if (aktifSekme === 'finans') setFinansModal(true);
-          else if (aktifSekme === 'stok') belgeYukleTetikle('irsaliye'); 
-          else belgeYukleTetikle('metraj'); 
+          else if (aktifSekme === 'stok') {
+            Alert.alert("Stok Ekle", "Yöntem seçin:", [
+              { text: "İptal", style: "cancel" },
+              { text: "📸 Fotoğrafla", onPress: () => belgeYukleTetikle('irsaliye') },
+              { text: "✏️ Manuel", onPress: () => setManuelStokModal(true) }
+            ]);
+          } else {
+            Alert.alert("Hedef Ekle", "Yöntem seçin:", [
+              { text: "İptal", style: "cancel" },
+              { text: "📸 Fotoğrafla", onPress: () => belgeYukleTetikle('metraj') },
+              { text: "✏️ Manuel", onPress: () => setManuelMetrajModal(true) }
+            ]);
+          }
         }}
       >
         <Text style={styles.fabIcon}>{aktifSekme === 'stok' || aktifSekme === 'metraj' ? '📸' : '+'}</Text>
@@ -468,6 +507,37 @@ export default function ProjeDetay() {
             <View style={styles.modalButtonRow}>
               <TouchableOpacity style={[styles.modalButton, {backgroundColor: '#6c757d'}]} onPress={() => setDuzenleModal(false)}><Text style={{color: 'white'}}>İptal</Text></TouchableOpacity>
               <TouchableOpacity style={[styles.modalButton, {backgroundColor: '#0d6efd'}]} onPress={finansDuzenleKaydet}><Text style={{color: 'white'}}>Güncelle</Text></TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={manuelStokModal} animationType="slide" transparent={true}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Manuel Stok Ekle</Text>
+            <TextInput style={styles.input} placeholder="Ürün Adı" value={yeniStokAd} onChangeText={setYeniStokAd} />
+            <TextInput style={styles.input} placeholder="Miktar" value={yeniStokMiktar} keyboardType="numeric" onChangeText={setYeniStokMiktar} />
+            <TextInput style={styles.input} placeholder="Birim (adet, kg, m² ...)" value={yeniStokBirim} onChangeText={setYeniStokBirim} />
+            <TextInput style={styles.input} placeholder="Birim Fiyat (opsiyonel)" value={yeniStokFiyat} keyboardType="numeric" onChangeText={setYeniStokFiyat} />
+            <View style={styles.modalButtonRow}>
+              <TouchableOpacity style={[styles.modalButton, {backgroundColor: '#dc3545'}]} onPress={() => setManuelStokModal(false)}><Text style={{color: 'white'}}>İptal</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.modalButton, {backgroundColor: '#6c757d'}]} onPress={manuelStokKaydet}><Text style={{color: 'white'}}>Kaydet</Text></TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={manuelMetrajModal} animationType="slide" transparent={true}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Manuel Hedef Ekle</Text>
+            <TextInput style={styles.input} placeholder="Hedef Adı" value={yeniMetrajAd} onChangeText={setYeniMetrajAd} />
+            <TextInput style={styles.input} placeholder="Planlanan Miktar" value={yeniMetrajMiktar} keyboardType="numeric" onChangeText={setYeniMetrajMiktar} />
+            <TextInput style={styles.input} placeholder="Birim (adet, kg, m² ...)" value={yeniMetrajBirim} onChangeText={setYeniMetrajBirim} />
+            <View style={styles.modalButtonRow}>
+              <TouchableOpacity style={[styles.modalButton, {backgroundColor: '#dc3545'}]} onPress={() => setManuelMetrajModal(false)}><Text style={{color: 'white'}}>İptal</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.modalButton, {backgroundColor: '#8540f5'}]} onPress={manuelMetrajKaydet}><Text style={{color: 'white'}}>Kaydet</Text></TouchableOpacity>
             </View>
           </View>
         </View>
