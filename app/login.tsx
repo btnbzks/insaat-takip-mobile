@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
-import React, { useState, useEffect } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View, FlatList, Switch } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function Login() {
   // --- STATE KONTROLLERİ ---
@@ -141,7 +141,7 @@ export default function Login() {
   return (
     <View style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.title}>İnşaat Takip</Text>
+        <Text style={styles.title}>İnşaat Takip v2</Text>
         <Text style={styles.subtitle}>Yönetici Paneli</Text>
 
         <TextInput 
