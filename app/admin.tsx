@@ -1,8 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Switch, Text, View } from 'react-native';
 
+type Company = {
+  id: number;
+  name: string;
+  active: boolean;
+};
+
 export default function AdminPanel() {
-  const [companies, setCompanies] = useState([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
 
   // 1. ŞİRKETLERİ SUNUCUDAN ÇEK
@@ -21,7 +27,7 @@ export default function AdminPanel() {
   useEffect(() => { fetchCompanies(); }, []);
 
   // 2. ŞALTERİ DEĞİŞTİR (Ödeme Kontrolü)
-  const toggleCompanyStatus = async (id, currentStatus) => {
+  const toggleCompanyStatus = async (id: number, currentStatus: boolean) => {
     try {
       const response = await fetch(`https://insaat-takip.onrender.com/api/companies/${id}/toggle-status`, {
         method: 'PUT'

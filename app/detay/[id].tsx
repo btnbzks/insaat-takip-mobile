@@ -2,10 +2,10 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-type SekmeTipi = 'ustalar' | 'finans' | 'stok' | 'metraj';
+type SekmeTipi = 'ustalar' | 'finans' | 'stok' | 'metraj' | 'gunluk';
 
 export default function ProjeDetay() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -16,6 +16,7 @@ export default function ProjeDetay() {
   const [finans, setFinans] = useState<any[]>([]);
   const [stok, setStok] = useState<any[]>([]);
   const [planlananlar, setPlanlananlar] = useState<any[]>([]);
+  const [gunlukRaporlar, setGunlukRaporlar] = useState<any[]>([]);
   const [yukleniyor, setYukleniyor] = useState(true);
 
   // Modallar
@@ -27,6 +28,7 @@ export default function ProjeDetay() {
   const [fotoModal, setFotoModal] = useState(false);
   const [manuelStokModal, setManuelStokModal] = useState(false);
   const [manuelMetrajModal, setManuelMetrajModal] = useState(false);
+  const [gunlukModal, setGunlukModal] = useState(false);
 
   // State'ler
   const [seciliFotoUrl, setSeciliFotoUrl] = useState('');
@@ -47,6 +49,10 @@ export default function ProjeDetay() {
   const [yeniMetrajAd, setYeniMetrajAd] = useState('');
   const [yeniMetrajMiktar, setYeniMetrajMiktar] = useState('');
   const [yeniMetrajBirim, setYeniMetrajBirim] = useState('');
+  // Günlük rapor state'leri
+  const [yeniGunlukAciklama, setYeniGunlukAciklama] = useState('');
+  const [yeniGunlukFotoUri, setYeniGunlukFotoUri] = useState<string | null>(null);
+  const [gunlukKaydetYukleniyor, setGunlukKaydetYukleniyor] = useState(false);
 
   const verileriGetir = () => {
     setYukleniyor(true);
@@ -54,12 +60,14 @@ export default function ProjeDetay() {
       fetch(`https://insaat-takip.onrender.com/api/cariler/proje/${id}`).then(res => res.json()),
       fetch(`https://insaat-takip.onrender.com/api/finans/proje/${id}`).then(res => res.json()),
       fetch(`https://insaat-takip.onrender.com/api/stock/proje/${id}`).then(res => res.json()),
-      fetch(`https://insaat-takip.onrender.com/api/metraj/proje/${id}`).then(res => res.json())
-    ]).then(([ustalarData, finansData, stokData, metrajData]) => {
+      fetch(`https://insaat-takip.onrender.com/api/metraj/proje/${id}`).then(res => res.json()),
+      fetch(`https://insaat-takip.onrender.com/api/gunluk/proje/${id}`).then(res => res.json())
+    ]).then(([ustalarData, finansData, stokData, metrajData, gunlukData]) => {
       setUstalar(ustalarData);
       setFinans(finansData);
       setStok(stokData);
       setPlanlananlar(metrajData);
+      setGunlukRaporlar(Array.isArray(gunlukData) ? gunlukData : []);
       setYukleniyor(false);
     }).catch((err) => {
       console.error(err);
@@ -182,6 +190,83 @@ export default function ProjeDetay() {
     });
   };
 
+  // --- GÜNLÜK RAPOR FONKSİYONLARI ---
+
+  const gunlukFotoCek = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') return Alert.alert('Hata', 'Kamera izni reddedildi!');
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
+    if (!result.canceled && result.assets[0]) setYeniGunlukFotoUri(result.assets[0].uri);
+  };
+
+  const gunlukGaleriSec = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return Alert.alert('Hata', 'Galeri izni reddedildi!');
+    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7 });
+    if (!result.canceled && result.assets[0]) setYeniGunlukFotoUri(result.assets[0].uri);
+  };
+
+  const gunlukFotoSec = () => {
+    Alert.alert('Fotoğraf Ekle', 'Yükleme yöntemini seçin:', [
+      { text: 'İptal', style: 'cancel' },
+      { text: '📷 Kamera', onPress: gunlukFotoCek },
+      { text: '🖼️ Galeri', onPress: gunlukGaleriSec },
+    ]);
+  };
+
+  const gunlukRaporKaydet = async () => {
+    if (!yeniGunlukAciklama.trim()) return Alert.alert('Hata', 'Açıklama giriniz!');
+    setGunlukKaydetYukleniyor(true);
+    try {
+      const formData = new FormData();
+      formData.append('description', yeniGunlukAciklama.trim());
+
+      if (yeniGunlukFotoUri) {
+        const compressed = await ImageManipulator.manipulateAsync(
+          yeniGunlukFotoUri,
+          [{ resize: { width: 1080 } }],
+          { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
+        );
+        const uri = compressed.uri;
+        const filename = uri.split('/').pop() || `gunluk_${Date.now()}.jpg`;
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
+        formData.append('file', { uri, name: filename, type } as any);
+      }
+
+      const res = await fetch(`https://insaat-takip.onrender.com/api/gunluk/proje/${id}`, {
+        method: 'POST',
+        body: formData,
+        headers: { 'Accept': 'application/json', 'Content-Type': 'multipart/form-data' },
+      });
+
+      if (res.ok) {
+        setGunlukModal(false);
+        setYeniGunlukAciklama('');
+        setYeniGunlukFotoUri(null);
+        verileriGetir();
+      } else {
+        const hata = await res.text();
+        Alert.alert('Hata', hata);
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Bağlantı Hatası', 'Sunucuya ulaşılamadı.');
+    } finally {
+      setGunlukKaydetYukleniyor(false);
+    }
+  };
+
+  const gunlukRaporSil = (raporId: number) => {
+    Alert.alert('Raporu Sil', 'Bu günlük raporu silmek istiyor musun?', [
+      { text: 'İptal', style: 'cancel' },
+      { text: 'Sil', style: 'destructive', onPress: () => {
+        fetch(`https://insaat-takip.onrender.com/api/gunluk/${raporId}`, { method: 'DELETE' })
+          .then(res => { if (res.ok) verileriGetir(); });
+      }}
+    ]);
+  };
+
   const ortakKaydet = () => {
     if (!ortakEmail) return;
     fetch(`https://insaat-takip.onrender.com/api/projeler/${id}/ortak-ekle`, {
@@ -261,6 +346,37 @@ export default function ProjeDetay() {
       <Text style={styles.metrajOzetiYazisi}>Proje bütçesinde planlanan toplam <Text style={{fontWeight: 'bold'}}>{planlananlar.length}</Text> hedef bulunuyor.</Text>
     </View>
   );
+
+  const gunlukOzetiCiz = () => (
+    <View style={styles.gunlukOzetiContainer}>
+      <Text style={styles.gunlukOzetiYazisi}>📋 Toplam <Text style={{fontWeight: 'bold'}}>{gunlukRaporlar.length}</Text> günlük ilerleme raporu kayıtlı.</Text>
+    </View>
+  );
+
+  const gunlukKartiCiz = ({ item }: { item: any }) => {
+    const tarihStr = item.date
+      ? new Date(item.date).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })
+      : '';
+    return (
+      <View style={styles.gunlukCard}>
+        <View style={styles.gunlukCardHeader}>
+          <View style={styles.gunlukTarihKutusu}>
+            <Text style={styles.gunlukTarihText}>{tarihStr}</Text>
+          </View>
+          <TouchableOpacity onPress={() => gunlukRaporSil(item.id)} style={styles.deleteUstaBtn}>
+            <Text style={{ fontSize: 18 }}>🗑️</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.gunlukAciklamaText}>{item.description}</Text>
+        {item.photoUrl ? (
+          <TouchableOpacity onPress={() => { setSeciliFotoUrl(item.photoUrl); setFotoModal(true); }}>
+            <Image source={{ uri: item.photoUrl }} style={styles.gunlukFotoOnizleme} resizeMode="cover" />
+            <Text style={styles.gunlukFotoAciklama}>📷 Fotoğrafı görmek için dokun</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+    );
+  };
 
   const ustaKartiCiz = ({ item }: { item: any }) => {
     const toplamOdenen = item.payments?.reduce((toplam: number, odeme: any) => toplam + odeme.amount, 0) || 0;
@@ -355,6 +471,7 @@ export default function ProjeDetay() {
     if (aktifSekme === 'finans') return finans;
     if (aktifSekme === 'stok') return stok;
     if (aktifSekme === 'metraj') return planlananlar;
+    if (aktifSekme === 'gunluk') return gunlukRaporlar;
     return [];
   };
 
@@ -362,7 +479,17 @@ export default function ProjeDetay() {
     if (aktifSekme === 'finans') return kasaOzetiCiz();
     if (aktifSekme === 'stok') return stokOzetiCiz();
     if (aktifSekme === 'metraj') return metrajOzetiCiz();
+    if (aktifSekme === 'gunluk') return gunlukOzetiCiz();
     return null;
+  };
+
+  const getAktifKartCiz = () => {
+    if (aktifSekme === 'ustalar') return ustaKartiCiz;
+    if (aktifSekme === 'finans') return finansKartiCiz;
+    if (aktifSekme === 'stok') return stokKartiCiz;
+    if (aktifSekme === 'metraj') return metrajKartiCiz;
+    if (aktifSekme === 'gunluk') return gunlukKartiCiz;
+    return ustaKartiCiz;
   };
 
   return (
@@ -377,7 +504,7 @@ export default function ProjeDetay() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.tabContainer}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabContainer}>
         <TouchableOpacity style={[styles.tabButton, aktifSekme === 'ustalar' && styles.activeTab]} onPress={() => setAktifSekme('ustalar')}>
           <Text style={[styles.tabText, aktifSekme === 'ustalar' && styles.activeTabText]}>👷 Ustalar</Text>
         </TouchableOpacity>
@@ -390,24 +517,43 @@ export default function ProjeDetay() {
         <TouchableOpacity style={[styles.tabButton, aktifSekme === 'metraj' && styles.activeTab]} onPress={() => setAktifSekme('metraj')}>
           <Text style={[styles.tabText, aktifSekme === 'metraj' && styles.activeTabText]}>📊 Hedef</Text>
         </TouchableOpacity>
-      </View>
+        <TouchableOpacity style={[styles.tabButton, aktifSekme === 'gunluk' && styles.activeTab]} onPress={() => setAktifSekme('gunluk')}>
+          <Text style={[styles.tabText, aktifSekme === 'gunluk' && styles.activeTabText]}>📅 Günlük</Text>
+        </TouchableOpacity>
+      </ScrollView>
 
       <View style={styles.content}>
         {yukleniyor ? <ActivityIndicator size="large" color="#0d6efd" /> :
           <FlatList
             data={getAktifListeData()}
             keyExtractor={(item) => item.id.toString()}
-            renderItem={aktifSekme === 'ustalar' ? ustaKartiCiz : (aktifSekme === 'finans' ? finansKartiCiz : (aktifSekme === 'stok' ? stokKartiCiz : metrajKartiCiz))}
+            renderItem={getAktifKartCiz()}
             ListHeaderComponent={getAktifHeader()}
+            ListEmptyComponent={
+              aktifSekme === 'gunluk' ? (
+                <View style={styles.bosListeContainer}>
+                  <Text style={styles.bosListeIkon}>📅</Text>
+                  <Text style={styles.bosListeYazi}>Henüz günlük rapor yok.</Text>
+                  <Text style={styles.bosListeAlt}>Sağ alttaki + butonuna basarak ilk raporunu ekle.</Text>
+                </View>
+              ) : null
+            }
           />
         }
       </View>
 
       <TouchableOpacity
-        style={[styles.fabButton, { backgroundColor: aktifSekme === 'ustalar' ? '#0d6efd' : (aktifSekme === 'finans' ? '#198754' : (aktifSekme === 'stok' ? '#6c757d' : '#8540f5')) }]}
+        style={[styles.fabButton, {
+          backgroundColor:
+            aktifSekme === 'ustalar' ? '#0d6efd' :
+            aktifSekme === 'finans' ? '#198754' :
+            aktifSekme === 'stok' ? '#6c757d' :
+            aktifSekme === 'metraj' ? '#8540f5' : '#e67e22'
+        }]}
         onPress={() => {
           if (aktifSekme === 'ustalar') setUstaModal(true);
           else if (aktifSekme === 'finans') setFinansModal(true);
+          else if (aktifSekme === 'gunluk') setGunlukModal(true);
           else if (aktifSekme === 'stok') {
             Alert.alert("Stok Ekle", "Yöntem seçin:", [
               { text: "İptal", style: "cancel" },
@@ -423,7 +569,9 @@ export default function ProjeDetay() {
           }
         }}
       >
-        <Text style={styles.fabIcon}>{aktifSekme === 'stok' || aktifSekme === 'metraj' ? '📸' : '+'}</Text>
+        <Text style={styles.fabIcon}>
+          {aktifSekme === 'stok' || aktifSekme === 'metraj' ? '📸' : aktifSekme === 'gunluk' ? '📝' : '+'}
+        </Text>
       </TouchableOpacity>
 
       <Modal visible={fotoModal} transparent={true} animationType="fade">
@@ -543,6 +691,56 @@ export default function ProjeDetay() {
         </View>
       </Modal>
 
+      {/* GÜNLÜK RAPOR EKLEME MODALİ */}
+      <Modal visible={gunlukModal} animationType="slide" transparent={true}>
+        <View style={styles.modalContainer}>
+          <View style={[styles.modalBox, { maxHeight: '85%' }]}>
+            <Text style={styles.modalTitle}>📅 Günlük Rapor</Text>
+            <Text style={styles.gunlukTarihLabel}>
+              📆 {new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}
+            </Text>
+            <TextInput
+              style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
+              placeholder="Bugün ne yapıldı? (açıklama)..."
+              value={yeniGunlukAciklama}
+              onChangeText={setYeniGunlukAciklama}
+              multiline
+              numberOfLines={4}
+            />
+            {yeniGunlukFotoUri ? (
+              <View style={{ marginBottom: 10, alignItems: 'center' }}>
+                <Image source={{ uri: yeniGunlukFotoUri }} style={styles.gunlukModalOnizleme} resizeMode="cover" />
+                <TouchableOpacity onPress={() => setYeniGunlukFotoUri(null)}>
+                  <Text style={{ color: '#dc3545', fontSize: 12, marginTop: 4 }}>✖ Fotoğrafı kaldır</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.fotoCekBtn} onPress={gunlukFotoSec}>
+                <Text style={styles.fotoCekBtnText}>📷 Fotoğraf Ekle (Opsiyonel)</Text>
+              </TouchableOpacity>
+            )}
+            <View style={styles.modalButtonRow}>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: '#6c757d' }]}
+                onPress={() => { setGunlukModal(false); setYeniGunlukAciklama(''); setYeniGunlukFotoUri(null); }}
+              >
+                <Text style={{ color: 'white' }}>İptal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: '#e67e22' }]}
+                onPress={gunlukRaporKaydet}
+                disabled={gunlukKaydetYukleniyor}
+              >
+                {gunlukKaydetYukleniyor
+                  ? <ActivityIndicator color="white" size="small" />
+                  : <Text style={{ color: 'white', fontWeight: 'bold' }}>Kaydet</Text>
+                }
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -554,8 +752,8 @@ const styles = StyleSheet.create({
   backButtonText: { color: 'white', fontWeight: 'bold' },
   headerText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
   ortakButton: { padding: 5 },
-  tabContainer: { flexDirection: 'row', backgroundColor: 'white', elevation: 2 },
-  tabButton: { flex: 1, padding: 10, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabContainer: { backgroundColor: 'white', elevation: 2 },
+  tabButton: { paddingHorizontal: 16, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
   activeTab: { borderBottomColor: '#212529' },
   tabText: { fontSize: 13, fontWeight: 'bold', color: '#666' },
   activeTabText: { color: '#212529' },
@@ -582,7 +780,7 @@ const styles = StyleSheet.create({
   fabButton: { position: 'absolute', right: 20, bottom: 20, width: 55, height: 55, borderRadius: 28, justifyContent: 'center', alignItems: 'center', elevation: 4 },
   fabIcon: { color: 'white', fontSize: 28 },
   modalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
-  modalBox: { width: '80%', backgroundColor: 'white', borderRadius: 15, padding: 20 },
+  modalBox: { width: '85%', backgroundColor: 'white', borderRadius: 15, padding: 20 },
   modalTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
   input: { backgroundColor: '#f8f9fa', borderWidth: 1, borderColor: '#ddd', borderRadius: 6, padding: 10, marginBottom: 10 },
   modalButtonRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
@@ -591,5 +789,23 @@ const styles = StyleSheet.create({
   turButon: { flex: 0.48, padding: 10, borderRadius: 6, alignItems: 'center', backgroundColor: '#eee' },
   fullFotoContainer: { flex: 1, backgroundColor: 'black', justifyContent: 'center', alignItems: 'center' },
   fullImage: { width: '100%', height: '80%' },
-  fotoKapatBtn: { position: 'absolute', top: 50, right: 20, zIndex: 1, padding: 10, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 10 }
+  fotoKapatBtn: { position: 'absolute', top: 50, right: 20, zIndex: 1, padding: 10, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 10 },
+  // --- GÜNLÜK RAPOR STİLLERİ ---
+  gunlukOzetiContainer: { backgroundColor: '#fff3e0', padding: 10, borderRadius: 6, marginBottom: 10, borderWidth: 1, borderColor: '#ffe0b2' },
+  gunlukOzetiYazisi: { fontSize: 11, color: '#e65100', textAlign: 'center' },
+  gunlukCard: { backgroundColor: 'white', borderRadius: 12, marginBottom: 14, elevation: 3, overflow: 'hidden', borderLeftWidth: 4, borderLeftColor: '#e67e22' },
+  gunlukCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff8f0', paddingHorizontal: 12, paddingVertical: 8 },
+  gunlukTarihKutusu: { backgroundColor: '#e67e22', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  gunlukTarihText: { color: 'white', fontWeight: 'bold', fontSize: 12 },
+  gunlukAciklamaText: { fontSize: 14, color: '#333', lineHeight: 20, paddingHorizontal: 12, paddingVertical: 10 },
+  gunlukFotoOnizleme: { width: '100%', height: 160, borderRadius: 0 },
+  gunlukFotoAciklama: { fontSize: 10, color: '#888', textAlign: 'center', paddingVertical: 4 },
+  gunlukTarihLabel: { fontSize: 13, color: '#e67e22', fontWeight: '600', textAlign: 'center', marginBottom: 12 },
+  fotoCekBtn: { backgroundColor: '#fff3e0', borderWidth: 1, borderColor: '#e67e22', borderStyle: 'dashed', borderRadius: 8, padding: 12, alignItems: 'center', marginBottom: 10 },
+  fotoCekBtnText: { color: '#e67e22', fontWeight: '600', fontSize: 13 },
+  gunlukModalOnizleme: { width: '100%', height: 120, borderRadius: 8 },
+  bosListeContainer: { alignItems: 'center', paddingTop: 60, paddingHorizontal: 30 },
+  bosListeIkon: { fontSize: 48, marginBottom: 12 },
+  bosListeYazi: { fontSize: 16, fontWeight: 'bold', color: '#555', textAlign: 'center' },
+  bosListeAlt: { fontSize: 12, color: '#999', textAlign: 'center', marginTop: 6 },
 });

@@ -2,6 +2,12 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
+type Company = {
+  id: number;
+  name: string;
+  active: boolean;
+};
+
 export default function Login() {
   // --- STATE KONTROLLERİ ---
   const [email, setEmail] = useState('');
@@ -11,7 +17,7 @@ export default function Login() {
   const router = useRouter();
 
   // --- ADMİN PANELİ STATE'LERİ ---
-  const [companies, setCompanies] = useState([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [adminLoading, setAdminLoading] = useState(true);
 
   // --- ADMİN: ŞİRKETLERİ ÇEK ---
@@ -36,7 +42,7 @@ export default function Login() {
   }, [showAdmin]);
 
   // --- ADMİN: ŞALTERİ DEĞİŞTİR ---
-  const toggleCompanyStatus = async (id, currentStatus) => {
+  const toggleCompanyStatus = async (id: number, currentStatus: boolean) => {
     try {
       const response = await fetch(`https://insaat-takip.onrender.com/api/companies/${id}/toggle-status`, {
         method: 'PUT'
@@ -52,7 +58,7 @@ export default function Login() {
   // --- GİRİŞ YAPMA FONKSİYONU ---
   const handleLogin = async () => {
     if (!email || !password) return Alert.alert("Hata", "Lütfen tüm alanları doldurun.");
-    
+
     setLoading(true);
     try {
       const response = await fetch(`https://insaat-takip.onrender.com/api/users/login?email=${email.toLowerCase()}&password=${password}`);
@@ -73,7 +79,7 @@ export default function Login() {
   // --- KAYIT OLMA FONKSİYONU ---
   const handleRegister = async () => {
     if (!email || !password) return Alert.alert("Hata", "Lütfen kayıt olmak için e-posta ve şifre yazın.");
-    
+
     setLoading(true);
     try {
       const response = await fetch(`https://insaat-takip.onrender.com/api/users/register`, {
@@ -104,16 +110,16 @@ export default function Login() {
         <TouchableOpacity style={styles.backButton} onPress={() => setShowAdmin(false)}>
           <Text style={styles.backButtonText}>← Geri Dön</Text>
         </TouchableOpacity>
-        
+
         <Text style={styles.adminHeader}>Süper Admin Paneli</Text>
-        
+
         {adminLoading ? (
           <ActivityIndicator size="large" color="#0d6efd" />
         ) : (
           <FlatList
             data={companies}
             keyExtractor={(item) => item.id.toString()}
-            ListEmptyComponent={<Text style={{color: 'white', textAlign: 'center'}}>Henüz kayıtlı şirket yok.</Text>}
+            ListEmptyComponent={<Text style={{ color: 'white', textAlign: 'center' }}>Henüz kayıtlı şirket yok.</Text>}
             renderItem={({ item }) => (
               <View style={styles.companyCard}>
                 <View>
@@ -141,12 +147,12 @@ export default function Login() {
   return (
     <View style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.title}>Şantiye Takip </Text>
+        <Text style={styles.title}>ŞANTİYE TAKİP </Text>
         <Text style={styles.subtitle}>Yönetici Paneli</Text>
 
-        <TextInput 
-          style={styles.input} 
-          placeholder="E-posta" 
+        <TextInput
+          style={styles.input}
+          placeholder="E-posta"
           placeholderTextColor="#999"
           value={email}
           onChangeText={setEmail}
@@ -154,9 +160,9 @@ export default function Login() {
           keyboardType="email-address"
         />
 
-        <TextInput 
-          style={styles.input} 
-          placeholder="Şifre" 
+        <TextInput
+          style={styles.input}
+          placeholder="Şifre"
           placeholderTextColor="#999"
           value={password}
           onChangeText={setPassword}
@@ -172,11 +178,11 @@ export default function Login() {
         </TouchableOpacity>
 
         {/* SÜPER ADMİN GİZLİ BUTONU - ARTIK AYRI SAYFAYA GİTMEZ, AYNI EKRANDA AÇAR */}
-        <TouchableOpacity 
-          style={{ backgroundColor: '#dc3545', borderRadius: 12, padding: 18, alignItems: 'center', marginTop: 30 }} 
-          onPress={() => setShowAdmin(true)} 
+        <TouchableOpacity
+          style={{ backgroundColor: '#dc3545', borderRadius: 12, padding: 18, alignItems: 'center', marginTop: 30 }}
+          onPress={() => setShowAdmin(true)}
         >
-          <Text style={styles.buttonText}>SÜPER ADMİN PANELİ</Text>
+          <Text style={styles.buttonText}>AP</Text>
         </TouchableOpacity>
 
       </View>
@@ -192,7 +198,7 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#2c2c2c', borderRadius: 12, padding: 15, marginBottom: 15, color: 'white', fontSize: 16, borderWidth: 1, borderColor: '#333' },
   button: { backgroundColor: '#0d6efd', borderRadius: 12, padding: 18, alignItems: 'center', marginTop: 10 },
   buttonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
-  
+
   // Admin Paneli Stilleri
   adminContainer: { flex: 1, backgroundColor: '#121212', padding: 20, paddingTop: 60, width: '100%' },
   adminHeader: { fontSize: 24, fontWeight: 'bold', color: 'white', marginBottom: 20, textAlign: 'center' },
